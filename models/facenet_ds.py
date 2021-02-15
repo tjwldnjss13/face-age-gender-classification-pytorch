@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from models.dsconv import DSConv
 
+
 class FaceNetDS(nn.Module):
     def __init__(self, num_age_classes):
         super(FaceNetDS, self).__init__()
@@ -15,6 +16,7 @@ class FaceNetDS(nn.Module):
         self.fc_gender2 = DSConv(64, 2, 1, 1, 0, True)
         self.fc_age = DSConv(1024, self.num_age_classes, 7, 1, 0, True)
         self.maxpool = nn.MaxPool2d(2, 2)
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -36,6 +38,9 @@ class FaceNetDS(nn.Module):
 
         gender = gender.squeeze()
         age = age.squeeze()
+
+        gender = self.softmax(gender)
+        age = self.softmax(age)
 
         return age, gender
 

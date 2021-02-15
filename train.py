@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, random_split
 from models.facenet_ds import FaceNetDS
 from datasets.afad_dataset import AFADDataset
 from loss import custom_softmax_cross_entropy_loss
-from metric import accuracy
+from metric import accuracy_argmax
 from utils.pytorch_util import make_batch
 from utils.util import time_calculator
 
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     # Define optimizer, metrics
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     loss_func = custom_softmax_cross_entropy_loss
-    acc_func = accuracy
+    acc_func = accuracy_argmax
 
     train_loss_list = []
     train_acc_age_list = []
@@ -73,8 +73,6 @@ if __name__ == '__main__':
 
     t_start = time.time()
     for e in range(num_epochs):
-        print('[{}/{}] '.format(e + 1, num_epochs), end='')
-
         num_data = 0
         num_batches = 0
         train_loss = 0
@@ -86,7 +84,9 @@ if __name__ == '__main__':
         for i, (imgs, anns) in enumerate(train_loader):
             num_data += len(imgs)
             num_batches += 1
-            print('{}/{} '.format(num_data, len(dset)))
+
+            print('[{}/{}] '.format(e + 1, num_epochs), end='')
+            print('{}/{} '.format(num_data, len(dset)), end='')
 
             x = make_batch(imgs).to(device)
             y_gender = make_batch(anns, 'gender').to(device)
@@ -106,18 +106,20 @@ if __name__ == '__main__':
             acc_age = acc_func(pred_age, y_age).item()
             acc_gender = acc_func(pred_gender, y_gender).item()
 
-            train_loss += loss.detach().cpu().item()
+            train_loss += loss
             train_acc_age += acc_age
             train_acc_gender += acc_gender
 
             t_batch_end = time.time()
             H, M, S = time_calculator(t_batch_end - t_start)
 
-            print('<loss> {:<20} <acc_age> {:<20} <acc_gender> {:<20} '.format(loss, acc_age, acc_gender), end='')
-            print('<loss_avg> {:<20} <acc_age_avg} {:<20} <acc_gender_avg} {:<20} '.format(
+            print('<loss> {:<10f} <acc_age> {:<10f} <acc_gender> {:<10f} '.format(loss, acc_age, acc_gender), end='')
+            print('<loss_avg> {:<10f} <acc_age_avg> {:<10f} <acc_gender_avg> {:<10f} '.format(
                 train_loss / num_batches, train_acc_age / num_batches, train_acc_gender / num_batches
             ), end='')
             print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
+
+            del x, y_age, y_gender, pred_age, pred_gender, loss, acc_age, acc_gender
 
         train_loss_list.append(train_loss / num_batches)
         train_acc_age_list.append(train_acc_age / num_batches)
@@ -126,7 +128,7 @@ if __name__ == '__main__':
         t_train_end = time.time()
         H, M, S = time_calculator(t_train_end - t_train_start)
 
-        print('        <train_loss> {:<20} <train_acc_acc> {:<20} <train_acc_gender> {:<20} '.format(
+        print('        <train_loss> {:<10f} <train_acc_acc> {:<10f} <train_acc_gender> {:<10f} '.format(
             train_loss_list[-1], train_acc_age_list[-1], train_acc_gender_list[-1]
         ), end='')
         print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
@@ -159,6 +161,8 @@ if __name__ == '__main__':
                 val_acc_age += acc_age
                 val_acc_gender += acc_gender
 
+                del x, y_age, y_gender, pred_age, pred_gender, loss, acc_age, acc_gender
+
             val_loss_list.append(val_loss / num_batches)
             val_acc_age_list.append(val_acc_age / num_batches)
             val_acc_gender_list.append(val_acc_gender / num_batches)
@@ -177,19 +181,19 @@ if __name__ == '__main__':
     plt.figure(0)
     plt.plot(x_axis, train_loss_list, 'r-', label='Train')
     plt.plot(x_axis, val_loss_list, 'b-', label='Val')
-    plt.Title('Loss')
+    plt.title('Loss')
     plt.legend()
 
     plt.figure(1)
     plt.plot(x_axis, train_acc_age_list, 'r-', label='Train')
     plt.plot(x_axis, val_acc_age_list, 'b-', label='Val')
-    plt.Title('Age accuracy')
+    plt.title('Age accuracy')
     plt.legend()
 
     plt.figure(2)
     plt.plot(x_axis, train_acc_gender_list, 'r-', label='Train')
     plt.plot(x_axis, val_acc_gender_list, 'b-', label='Val')
-    plt.Title('Gender accuracy')
+    plt.title('Gender accuracy')
     plt.legend()
 
     plt.show()

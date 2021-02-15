@@ -30,7 +30,7 @@ class AFADDataset(data.Dataset):
         label_gender = self.label_gender_list[idx]
 
         if self.categorical:
-            label_age = self.to_categorical(label_age, len(self.label_age_list), self.label_age_list)
+            label_age = self.to_categorical(label_age, len(self.age_class_list), self.age_class_list)
             label_gender = self.to_categorical(label_gender, 2)
 
         label_age = torch.as_tensor(label_age, dtype=torch.int64)
@@ -76,7 +76,7 @@ class AFADDataset(data.Dataset):
     def to_categorical(label, num_classes, ref_list=None):
         base = [0 for _ in range(num_classes)]
         if ref_list is not None:
-            label[ref_list.index(label)] = 1
+            base[ref_list.index(label)] = 1
         else:
             base[label] = 1
 

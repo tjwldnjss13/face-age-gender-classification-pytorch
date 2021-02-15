@@ -10,6 +10,23 @@ def accuracy(predict, target):
     return and_sum / or_sum / predict.shape[0]
 
 
+def accuracy_argmax(predict, target):
+    """
+    :param predict: tensor, [num batches, (categorical probabilities)]
+    :param target: tensor, [num_batches, (categorical probabilities)]
+
+    :return: tensor, accuracy
+    """
+    assert predict.shape == target.shape
+
+    pred_argmax = predict.argmax(dim=1)
+    tar_argmax = target.argmax(dim=1)
+
+    match = (pred_argmax == tar_argmax)
+
+    return match.sum() / predict.shape[0]
+
+
 def exact_match_ratio(predict, target):
     assert predict.shape == target.shape
 
