@@ -9,7 +9,7 @@ class DSConv(nn.Module):
         self.dconv = DConv(in_channels, kernel_size, stride, padding)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
         if activation:
-            self.relu = nn.ReLU(True)
+            self.lrelu = nn.LeakyReLU(.1, True)
         if batch_norm:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(out_channels)
@@ -24,12 +24,12 @@ class DSConv(nn.Module):
         if self.batch_norm:
             x = self.bn1(x)
         if self.activation:
-            x = self.relu(x)
+            x = self.lrelu(x)
         x = self.conv1x1(x)
         if self.batch_norm:
             x = self.bn2(x)
         if self.activation:
-            x = self.relu(x)
+            x = self.lrelu(x)
 
         return x
 

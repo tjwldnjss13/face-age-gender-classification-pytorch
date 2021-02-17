@@ -36,9 +36,10 @@ class AFADDataset(data.Dataset):
         label_age = torch.as_tensor(label_age, dtype=torch.int64)
         label_gender = torch.as_tensor(label_gender, dtype=torch.int64)
 
-        ann = {'age': label_age, 'gender': label_gender}
+        # ann = {'age': label_age, 'gender': label_gender}
+        label = torch.cat([label_gender, label_age], dim=0)
 
-        return img, ann
+        return img, label
 
     def __len__(self):
         return len(self.img_pth_list)

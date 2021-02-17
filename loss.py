@@ -2,6 +2,21 @@ import torch
 import torch.nn as nn
 
 
+def custom_age_gender_loss(predict, target, lambda_age, lambda_gender):
+    assert predict.shape == target.shape
+
+    pred_gender = predict[:, :2]
+    pred_age = predict[:, 2:]
+
+    target_gender = target[:, :2]
+    target_age = target[:, 2:]
+
+    loss_gender = custom_softmax_cross_entropy_loss(pred_gender, target_gender)
+    loss_age = custom_softmax_cross_entropy_loss(pred_age, target_age)
+
+    return lambda_gender * loss_gender + lambda_age * loss_age
+
+
 def custom_softmax_cross_entropy_loss(predict, target):
     assert predict.shape == target.shape
 
