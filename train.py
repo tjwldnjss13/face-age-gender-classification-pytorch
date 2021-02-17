@@ -1,11 +1,12 @@
 import time
 import argparse
 import torch
+import numpy as np
 import torch.optim as optim
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
 
 from models.facenet_ds import FaceNetDS
 from datasets.afad_dataset import AFADDataset
@@ -21,15 +22,17 @@ if __name__ == '__main__':
     # Define hyper parameters, parsers
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--batch_size', required=False, type=int, default=32)
-    parser.add_argument('--learning_rate', required=False, type=float, default=.001)
-    parser.add_argument('--weight_decay', required=False, type=float, default=.001)
-    parser.add_argument('--num_epochs', required=False, type=int, default=50)
+    parser.add_argument('--batch_size', required=False, type=int, default=64)
+    parser.add_argument('--learning_rate', required=False, type=float, default=.1)
+    parser.add_argument('--momentum', required=False, type=float, default=.9)
+    parser.add_argument('--weight_decay', required=False, type=float, default=.005)
+    parser.add_argument('--num_epochs', required=False, type=int, default=100)
 
     args = parser.parse_args()
 
     batch_size = args.batch_size
     learning_rate = args.learning_rate
+    momentum = args.momentum
     weight_decay = args.weight_decay
     num_epochs = args.num_epochs
 
@@ -37,16 +40,26 @@ if __name__ == '__main__':
 
     # Load AFAD dataset
     dset_name = 'afadfull'
-    root = 'D://DeepLearningData/AFAD-Full/'
-    transform = transforms.Compose([transforms.Resize((112, 112)), transforms.ToTensor()])
-    dset = AFADDataset(root=root, transforms=transform, categorical=True)
+    root = 'C://DeepLearningData/AFAD-Full/'
+    transform_no_aug = transforms.Compose([transforms.Resize((112, 112)),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_aug = transforms.Compose([transforms.Resize((112, 112)),
+                                           transforms.RandomRotation((-30, 30)),
+                                           transforms.RandomVerticalFlip(),
+                                           transforms.ToTensor(),
+                                           transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    dset_no_aug = AFADDataset(root=root, transforms=transform_no_aug, categorical=True)
+    dset = AFADDataset(root, transforms=transform_aug, categorical=True)
 
     n_data = len(dset)
+    indices = list(range(n_data))
     n_train_data = int(n_data * .7)
-    n_val_data = n_data - n_train_data
-    train_val_ratio = [n_train_data, n_val_data]
+    np.random.shuffle(indices)
+    train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
 
-    train_dset, val_dset = random_split(dset, train_val_ratio)
+    train_dset = Subset(dset, indices=train_idx)
+    val_dset = Subset(dset_no_aug, indices=val_idx)
 
     # Generate data loader
     train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=dset.custom_collate_fn)
@@ -55,12 +68,13 @@ if __name__ == '__main__':
     # Define model
     model_name = 'facenet'
     model = FaceNetDS(num_age_classes=len(dset.age_class_list)).to(device)
-    state_dict_pth = None
+    state_dict_pth = 'pretrained models/facenet_afadfull_2epoch_0.1lr_9.22758loss_0.077accage_0.614accgender.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
 
     # Define optimizer, metrics
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    # optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay, nesterov=True)
     loss_func = custom_softmax_cross_entropy_loss
     acc_func = accuracy_argmax
 
@@ -86,7 +100,7 @@ if __name__ == '__main__':
             num_batches += 1
 
             print('[{}/{}] '.format(e + 1, num_epochs), end='')
-            print('{}/{} '.format(num_data, len(dset)), end='')
+            print('{}/{} '.format(num_data, n_train_data), end='')
 
             x = make_batch(imgs).to(device)
             y_gender = make_batch(anns, 'gender').to(device)
@@ -119,7 +133,7 @@ if __name__ == '__main__':
             ), end='')
             print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
 
-            del x, y_age, y_gender, pred_age, pred_gender, loss, acc_age, acc_gender
+            del x, y_age, y_gender, pred_age, pred_gender, loss, loss_age, loss_gender, acc_age, acc_gender
 
         train_loss_list.append(train_loss / num_batches)
         train_acc_age_list.append(train_acc_age / num_batches)
@@ -138,6 +152,7 @@ if __name__ == '__main__':
         val_acc_age = 0
         val_acc_gender = 0
 
+        t_val_start = time.time()
         model.eval()
         with torch.no_grad():
             for j, (imgs, anns) in enumerate(val_loader):
@@ -161,20 +176,25 @@ if __name__ == '__main__':
                 val_acc_age += acc_age
                 val_acc_gender += acc_gender
 
-                del x, y_age, y_gender, pred_age, pred_gender, loss, acc_age, acc_gender
+                del x, y_age, y_gender, pred_age, pred_gender, loss, loss_age, loss_gender, acc_age, acc_gender
 
             val_loss_list.append(val_loss / num_batches)
             val_acc_age_list.append(val_acc_age / num_batches)
             val_acc_gender_list.append(val_acc_gender / num_batches)
 
-            print('        <val_loss> {:<20} <val_acc_age> {:<20} <val_acc_gender> {:<20}'.format(
+            print('        <val_loss> {:<10f} <val_acc_age> {:<10f} <val_acc_gender> {:<10f} '.format(
                 val_loss_list[-1], val_acc_age_list[-1], val_acc_gender_list[-1]
-            ))
+            ), end='')
+
+        t_val_end = time.time()
+        H, M, S = time_calculator(t_val_end - t_val_start)
+        print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
 
         if (e + 1) % model_save_term == 0:
-            save_pth = 'saved models/{}_{}_{}lr_{:.5f}loss_{:.3f}accage_{:.3f}accgender'.format(
-                model_name, dset_name, learning_rate, val_loss_list[-1], val_acc_age_list[-1], val_acc_gender_list[-1]
+            save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss_{:.3f}accage_{:.3f}accgender.pth'.format(
+                model_name, dset_name, e + 1, learning_rate, val_loss_list[-1], val_acc_age_list[-1], val_acc_gender_list[-1]
             )
+            torch.save(model.state_dict(), save_pth)
 
     x_axis = [i for i in range(num_epochs)]
 

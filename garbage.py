@@ -2,12 +2,17 @@ import os
 import glob
 import torch
 
+from torch.utils.data import random_split
+
 from datasets.afad_dataset import AFADDataset
 from os import listdir
 
-# root = 'D://DeepLearningData/AFAD-Full/'
-# dset = AFADDataset(root=root)
+root = 'D://DeepLearningData/AFAD-Full/'
+dset = AFADDataset(root=root)
 
-a = torch.Tensor([[1.2, 2.4, 0.5], [3.2, 1.5, 532.3]])
-a_argmax = a.argmax(dim=1)
-print(a_argmax)
+n_data = len(dset)
+n_train_data = int(n_data * .7)
+train_val_ratio = [n_train_data, n_data - n_train_data]
+train_dset, val_dset = random_split(dset, train_val_ratio)
+print(val_dset.transform)
+

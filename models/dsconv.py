@@ -2,12 +2,14 @@ import torch.nn as nn
 
 
 class DSConv(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, batch_norm=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride, padding, activation=False, batch_norm=False):
         super(DSConv, self).__init__()
+        self.activation = activation
         self.batch_norm = batch_norm
         self.dconv = DConv(in_channels, kernel_size, stride, padding)
         self.conv1x1 = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
-        self.relu = nn.ReLU(True)
+        if activation:
+            self.relu = nn.ReLU(True)
         if batch_norm:
             self.bn1 = nn.BatchNorm2d(in_channels)
             self.bn2 = nn.BatchNorm2d(out_channels)
@@ -21,11 +23,13 @@ class DSConv(nn.Module):
         x = self.dconv(x)
         if self.batch_norm:
             x = self.bn1(x)
-        x = self.relu(x)
+        if self.activation:
+            x = self.relu(x)
         x = self.conv1x1(x)
         if self.batch_norm:
             x = self.bn2(x)
-        x = self.relu(x)
+        if self.activation:
+            x = self.relu(x)
 
         return x
 
