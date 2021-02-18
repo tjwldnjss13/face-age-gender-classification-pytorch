@@ -122,7 +122,7 @@ if __name__ == '__main__':
             # loss_age = custom_softmax_cross_entropy_loss(pred_age, y_age)
             # loss_gender = custom_softmax_cross_entropy_loss(pred_gender, y_gender)
             predict = model(x)
-            loss = loss_func(predict, y, 5, .5)
+            loss = loss_func(predict, y, 10, .5)
 
             # loss = loss_age + loss_gender
 
@@ -218,7 +218,7 @@ if __name__ == '__main__':
         print('<time> {:02d}:{:02d}:{:02d}'.format(int(H), int(M), int(S)))
 
         if (e + 1) % model_save_term == 0:
-            save_pth = 'saved models/{}_skip_{}_{}epoch_{}lr_{:.5f}loss_{:.5f}accage_{:.5f}accgender.pth'.format(
+            save_pth = 'saved models/{}_{}_{}epoch_{}lr_{:.5f}loss_{:.5f}accage_{:.5f}accgender.pth'.format(
                 model_name, dset_name, e + 1, learning_rate, val_loss_list[-1], val_acc_age_list[-1], val_acc_gender_list[-1]
             )
             torch.save(model.state_dict(), save_pth)
