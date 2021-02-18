@@ -48,7 +48,7 @@ class AFADDataset(data.Dataset):
         print('Loading annotations...')
         img_pth_list = []
         label_gender_list = []  # 0: Male, 1: Female
-        label_age_list = []  # Lite: 18-39, Full: 15-75
+        label_age_list = []  # Lite: 18-39, Full: 15-70,72
         age_class_list = []
         age_dir_list = [f for f in list(filter(os.path.isdir, glob.glob(os.path.join(self.root, '*'))))]
 

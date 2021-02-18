@@ -6,7 +6,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 
-from torch.utils.data import DataLoader, Subset, ConcatDataset
+from torch.utils.data import DataLoader, random_split, Subset
 
 from models.facenet_ds import FaceNetDS
 from models.mobilenetv2 import MobilenetV2
@@ -42,43 +42,35 @@ if __name__ == '__main__':
     # Load AFAD dataset
     dset_name = 'afadfull'
     root = 'C://DeepLearningData/AFAD-Full/'
-    transform_og = transforms.Compose([transforms.Resize((224, 224)),
-                                       transforms.ToTensor(),
-                                       transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_rotate = transforms.Compose([transforms.Resize((224, 224)),
-                                           transforms.RandomRotation((-60, 60)),
+    transform_no_aug = transforms.Compose([transforms.Resize((112, 112)),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_aug = transforms.Compose([transforms.Resize((112, 112)),
+                                           transforms.RandomRotation((-30, 30)),
+                                           transforms.RandomVerticalFlip(),
                                            transforms.ToTensor(),
                                            transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_flip = transforms.Compose([transforms.Resize((224, 224)),
-                                         transforms.RandomHorizontalFlip(1),
-                                         transforms.ToTensor(),
-                                         transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    dset_no_aug = AFADDataset(root=root, transforms=transform_no_aug, categorical=True)
+    dset = AFADDataset(root, transforms=transform_aug, categorical=True)
 
-    dset_og = AFADDataset(root=root, transforms=transform_og, categorical=True)
-    dset_rotate = AFADDataset(root, transforms=transform_rotate, categorical=True)
-    dset_flip = AFADDataset(root, transforms=transform_flip, categorical=True)
-
-    n_data = len(dset_og)
+    n_data = len(dset)
     indices = list(range(n_data))
     n_train_data = int(n_data * .7)
     np.random.shuffle(indices)
     train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
 
-    train_dset_og = Subset(dset_og, indices=train_idx)
-    train_dset_rotate = Subset(dset_rotate, indices=train_idx)
-    train_dset_flip = Subset(dset_flip, indices=train_idx)
-    train_dset = ConcatDataset([train_dset_og, train_dset_rotate, train_dset_flip])
-    val_dset = Subset(dset_og, indices=val_idx)
+    train_dset = Subset(dset, indices=train_idx)
+    val_dset = Subset(dset_no_aug, indices=val_idx)
 
     # Generate data loader
-    train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=dset_og.custom_collate_fn)
-    val_loader = DataLoader(val_dset, batch_size=batch_size, shuffle=True, collate_fn=dset_og.custom_collate_fn)
+    train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, collate_fn=dset.custom_collate_fn)
+    val_loader = DataLoader(val_dset, batch_size=batch_size, shuffle=True, collate_fn=dset.custom_collate_fn)
 
     # Define model
     # model_name = 'facenet'
     model_name = 'mobilenetv2'
     # model = FaceNetDS(num_age_classes=len(dset.age_class_list)).to(device)
-    model = MobilenetV2(len(dset_og.age_class_list)).to(device)
+    model = MobilenetV2(len(dset.age_class_list)).to(device)
     state_dict_pth = None
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth))
@@ -111,7 +103,7 @@ if __name__ == '__main__':
             num_batches += 1
 
             print('[{}/{}] '.format(e + 1, num_epochs), end='')
-            print('{}/{} '.format(num_data, len(train_dset)), end='')
+            print('{}/{} '.format(num_data, n_train_data), end='')
 
             x = make_batch(imgs).to(device)
             # y_gender = make_batch(anns, 'gender').to(device)
