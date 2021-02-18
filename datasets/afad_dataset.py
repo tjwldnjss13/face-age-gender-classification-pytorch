@@ -7,9 +7,10 @@ import torchvision.transforms as transforms
 from os import listdir
 from PIL import Image
 
+from datasets.dataset_sampling import shift_random
 
 ######################## AFAD data balance ########################
-afad_dict = {
+num_afad_data_dict = {
     15: 445 + 806,
     16: 951 + 1482,
     17: 1135 + 1347,
@@ -77,36 +78,20 @@ class AFADDataset(data.Dataset):
         self.transforms = transforms
         self.categorical = categorical
 
+        self.num_age_classes = 26  # Ages over 40 are all refered to '40-'
         self.age_class_list = None
         self.img_pth_list = None
         self.label_gender_list = None
         self.label_age_list = None
+        self.sampled_img_pth_list = None
+        self.sampled_label_gender_list = None
+        self.sampled_label_age_list = None
         self.label_dict = {0: 'male', 1: 'female'}
 
-        self.load_annotation_list()
+        self._load_annotation_list()
+        self._balance_dataset()
 
-    def __getitem__(self, idx):
-        img = Image.open(self.img_pth_list[idx])
-        img = self.transforms(img)
-        label_age = self.label_age_list[idx]
-        label_gender = self.label_gender_list[idx]
-
-        if self.categorical:
-            label_age = self.to_categorical(label_age, len(self.age_class_list), self.age_class_list)
-            label_gender = self.to_categorical(label_gender, 2)
-
-        label_age = torch.as_tensor(label_age, dtype=torch.int64)
-        label_gender = torch.as_tensor(label_gender, dtype=torch.int64)
-
-        # ann = {'age': label_age, 'gender': label_gender}
-        label = torch.cat([label_gender, label_age], dim=0)
-
-        return img, label
-
-    def __len__(self):
-        return len(self.img_pth_list)
-
-    def load_annotation_list(self):
+    def _load_annotation_list(self):
         print('Loading annotations...')
         img_pth_list = []
         label_gender_list = []  # 0: Male, 1: Female
@@ -135,6 +120,72 @@ class AFADDataset(data.Dataset):
 
         print('Annotations loaded!')
 
+    def _balance_dataset(self):
+        print('Balancing dataset...')
+        sampled_img_pth_list = []
+        sampled_label_gender_list = []
+        sampled_label_age_list = []
+
+        age_list = list(num_afad_data_dict.keys())
+        num_data_list = list(num_afad_data_dict.values())
+
+        max_num_data = max(num_data_list)
+        idx_max_num_data = num_data_list.index(max_num_data)
+        idx_age_40 = age_list.index(40)
+        for i in range(idx_age_40 + 1):
+            if i == idx_max_num_data:
+                continue
+
+            if i != idx_age_40:
+                num_data = num_data_list[i]
+            else:
+                num_data = sum(num_data_list[i:])
+            num_sampled_data = 0
+            while num_data < .6 * max_num_data and num_data + num_sampled_data < max_num_data:
+                idx_start = sum(num_data_list[:i])
+                sampled_img_pth_list += self.img_pth_list[idx_start:idx_start + num_data]
+                sampled_label_gender_list += self.label_gender_list[idx_start:idx_start + num_data]
+                sampled_label_age_list += self.label_age_list[idx_start:idx_start + num_data]
+                num_sampled_data += num_data
+
+        self.sampled_img_pth_list = sampled_img_pth_list
+        self.sampled_label_gender_list = sampled_label_gender_list
+        self.sampled_label_age_list = sampled_label_age_list
+
+        print('Dataset balanced!!!')
+
+    def __getitem__(self, idx):
+        if idx < len(self.img_pth_list):
+            img = Image.open(self.img_pth_list[idx])
+            label_age = self.label_age_list[idx]
+            label_gender = self.label_gender[idx]
+        else:
+            img = Image.open(self.sampled_img_pth_list[idx - len(self.img_pth_list)])
+            img = shift_random(img)
+            label_age = self.sampled_label_age_list[idx - len(self.img_pth_list)]
+            label_gender = self.sampled_label_gender_list[idx - len(self.img_pth_list)]
+        img = self.transforms(img)
+
+        label_age = min(label_age, 40)
+
+        if self.categorical:
+            label_age = self.to_categorical(label_age, len(self.age_class_list), self.age_class_list)
+            label_gender = self.to_categorical(label_gender, 2)
+
+        label_age = torch.as_tensor(label_age, dtype=torch.int64)
+        label_gender = torch.as_tensor(label_gender, dtype=torch.int64)
+
+        # ann = {'age': label_age, 'gender': label_gender}
+        if self.categorical:
+            label = torch.cat([label_gender, label_age], dim=0)
+
+            return img, label
+        else:
+            return img, label_age, label_gender
+
+    def __len__(self):
+        return len(self.img_pth_list) + len(self.sampled_img_pth_list)
+
     @staticmethod
     def to_categorical(label, num_classes, ref_list=None):
         base = [0 for _ in range(num_classes)]
@@ -151,3 +202,10 @@ class AFADDataset(data.Dataset):
         label = [item[1] for item in batch]
 
         return img, label
+
+
+if __name__ == '__main__':
+    root = 'D://DeepLearningData/AFAD-Full/'
+    dset = AFADDataset(root, categorical=True)
+    print(len(dset))
+    img, ann = dset[300000]

@@ -4,7 +4,7 @@ import torch
 
 from torch.utils.data import random_split
 
-from datasets.afad_dataset import AFADDataset, afad_dict
+from datasets.afad_dataset import AFADDataset
 from os import listdir
 
 # root = 'D://DeepLearningData/AFAD-Full/'
@@ -16,12 +16,7 @@ from os import listdir
 # train_dset, val_dset = random_split(dset, train_val_ratio)
 # print(val_dset.transform)
 
-ages, num_data = list(afad_dict.keys()), list(afad_dict.values())
+import numpy as np
 
-import matplotlib.pyplot as plt
-fig = plt.figure(0)
-plt.bar([i for i in range(len(ages))], num_data)
-plt.xlabel('Ages')
-plt.ylabel('Num data')
-plt.xticks([i for i in range(len(ages))], ages)
-plt.show()
+a = [1, 2, 3, 4, 5, 6, 7]
+print(a[3:])
