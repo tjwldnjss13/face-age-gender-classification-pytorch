@@ -27,8 +27,6 @@ def make_batch(datas, category=None):
             data_batch = torch.cat([data_batch, temp], dim=0)
             i += 1
 
-    data_batch = data_batch.squeeze(dim=0)
-
     return data_batch
 
 

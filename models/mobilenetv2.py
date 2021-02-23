@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 from models.bottleneck_residual import BottleneckResidualBlock
+from torchvision.models import resnet50, mobilenet_v2
 
 
 class MobilenetV2(nn.Module):
@@ -37,16 +38,34 @@ class MobilenetV2(nn.Module):
             BottleneckResidualBlock(160, 160, 1, 6),
         )
         self.conv8 = BottleneckResidualBlock(160, 320, 1, 6)
-        self.conv9 = nn.Conv2d(320, 1280, 1, 1, 0)
-        self.conv10 = nn.Conv2d(1280, num_age_classes + num_gender_classes, 1, 1, 0)
+        self.conv9 = nn.Sequential(
+            nn.Conv2d(320, 1280, 1, 1, 0),
+            nn.ReLU6(True),
+        )
+        self.dense = nn.Sequential(
+            nn.Linear(1280, 320),
+            nn.ReLU6(True),
+        )
+        self.classifier = nn.Linear(320, num_age_classes)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         self._initialize_weight()
 
     def _initialize_weight(self):
-        nn.init.kaiming_normal_(self.conv1.weight)
-        nn.init.kaiming_normal_(self.conv9.weight)
-        nn.init.kaiming_normal_(self.conv10.weight)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.zeros_(m.bias)
+        # nn.init.kaiming_normal_(self.conv1.weight, mode='fan_out')
+        # nn.init.kaiming_normal_(self.conv9.weight, mode='fan_out')
+        # nn.init.kaiming_normal_(self.conv10.weight, mode='fan_out')
 
     def forward(self, x):
         x = self.conv1(x)
@@ -59,9 +78,10 @@ class MobilenetV2(nn.Module):
         x = self.conv8(x)
         x = self.conv9(x)
         x = self.avgpool(x)
-        x = self.conv10(x)
-
-        x = x.squeeze()
+        x = x.reshape(x.shape[0], -1)
+        x = self.dense(x)
+        x = self.classifier(x)
+        x = x.squeeze(-1).squeeze(-1)
 
         return x
 
@@ -69,7 +89,7 @@ class MobilenetV2(nn.Module):
 if __name__ == '__main__':
     import torch
     from torchsummary import summary
-    model = MobilenetV2(61).cuda()
+    model = MobilenetV2(11).cuda()
     summary(model, (3, 224, 224))
     dummy = torch.zeros(2, 3, 224, 224).cuda()
     print(model(dummy).shape)

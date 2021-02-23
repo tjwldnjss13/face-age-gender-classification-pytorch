@@ -18,5 +18,6 @@ from os import listdir
 
 import numpy as np
 
-a = [1, 2, 3, 4, 5, 6, 7]
-print(a[3:])
+a = torch.zeros(3, 1, 1, 4)
+a = a.squeeze(dim=1)
+print(a.shape)

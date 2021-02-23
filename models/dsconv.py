@@ -17,7 +17,15 @@ class DSConv(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self):
-        nn.init.kaiming_uniform_(self.conv1x1.weight)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+        # nn.init.kaiming_uniform_(self.conv1x1.weight)
 
     def forward(self, x):
         x = self.dconv(x)
@@ -42,7 +50,7 @@ class DConv(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self):
-        nn.init.kaiming_uniform_(self.dconv.weight)
+        nn.init.kaiming_uniform_(self.dconv.weight, mode='fan_out')
 
     def forward(self, x):
         return self.dconv(x)

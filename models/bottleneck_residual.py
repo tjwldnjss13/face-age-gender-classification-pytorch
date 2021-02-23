@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from models.dsconv import DSConv
+from models.dsconv import DConv
 
 
 class BottleneckResidualBlock(nn.Module):
@@ -13,23 +13,48 @@ class BottleneckResidualBlock(nn.Module):
 
         self.mid_channels = in_channels * expansion_factor
         self.conv1x1_1 = nn.Conv2d(in_channels, self.mid_channels, 1, 1, 0)
-        self.dsconv = DSConv(self.mid_channels, self.mid_channels, 3, stride, 1, False, False)
+        self.dsconv = DConv(self.mid_channels, 3, stride, 1)
         self.conv1X1_2 = nn.Conv2d(self.mid_channels, out_channels, 1, 1, 0)
+        self.bn1 = nn.BatchNorm2d(self.mid_channels)
+        self.bn2 = nn.BatchNorm2d(out_channels)
         self.relu6 = nn.ReLU6(True)
         self.lrelu = nn.LeakyReLU(.1, True)
+        self.dropout = nn.Dropout2d()
+        if stride == 1:
+            self.conv_residual = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
+        else:
+            self.conv_residual = nn.Conv2d(in_channels, out_channels, 3, 2, 1)
 
         self._initialize_weight()
 
     def _initialize_weight(self):
-        nn.init.kaiming_normal_(self.conv1x1_1.weight)
-        nn.init.kaiming_normal_(self.conv1X1_2.weight)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+        # nn.init.kaiming_normal_(self.conv1x1_1.weight)
+        # nn.init.kaiming_normal_(self.conv1X1_2.weight)
+        # nn.init.kaiming_normal_(self.conv_residual.weight)
 
     def forward(self, x):
+        residual = x
         x = self.conv1x1_1(x)
+        # x = self.bn1(x)
         x = self.relu6(x)
         x = self.dsconv(x)
+        # x = self.bn1(x)
         x = self.relu6(x)
         x = self.conv1X1_2(x)
+        # x = self.bn2(x)
+
+        residual = self.conv_residual(residual)
+        x += residual
+
+        x = self.relu6(x)
 
         return x
 

@@ -78,7 +78,7 @@ class AFADDataset(data.Dataset):
         self.transforms = transforms
         self.categorical = categorical
 
-        self.num_age_classes = 26  # Ages over 40 are all refered to '40-'
+        self.num_age_classes = 11
         self.age_class_list = None
         self.img_pth_list = None
         self.label_gender_list = None
@@ -156,32 +156,61 @@ class AFADDataset(data.Dataset):
 
     def __getitem__(self, idx):
         if idx < len(self.img_pth_list):
-            img = Image.open(self.img_pth_list[idx])
+            img_pth = self.img_pth_list[idx]
+            img = Image.open(img_pth)
             label_age = self.label_age_list[idx]
-            label_gender = self.label_gender[idx]
+            label_gender = self.label_gender_list[idx]
         else:
-            img = Image.open(self.sampled_img_pth_list[idx - len(self.img_pth_list)])
+            img_pth = self.sampled_img_pth_list[idx - len(self.img_pth_list)]
+            img = Image.open(img_pth)
             img = shift_random(img)
             label_age = self.sampled_label_age_list[idx - len(self.img_pth_list)]
             label_gender = self.sampled_label_gender_list[idx - len(self.img_pth_list)]
         img = self.transforms(img)
 
-        label_age = min(label_age, 40)
+        # label_age = min(label_age, 40)
+        if label_age <= 16:
+            label_age = 0
+        elif label_age <= 19:
+            label_age = 1
+        elif label_age <= 22:
+            label_age = 2
+        elif label_age <= 24:
+            label_age = 3
+        elif label_age <= 27:
+            label_age = 4
+        elif label_age <= 29:
+            label_age = 5
+        elif label_age <= 32:
+            label_age = 6
+        elif label_age <= 34:
+            label_age = 7
+        elif label_age <= 36:
+            label_age = 8
+        elif label_age <= 38:
+            label_age = 9
+        else:
+            label_age = 10
 
         if self.categorical:
-            label_age = self.to_categorical(label_age, len(self.age_class_list), self.age_class_list)
-            label_gender = self.to_categorical(label_gender, 2)
+            label_age_cate = self.to_categorical(label_age, self.num_age_classes)
+            label_gender_cate = self.to_categorical(label_gender, 2)
+
+            label_age_cate = torch.as_tensor(label_age_cate, dtype=torch.int64)
+            label_gender_cate = torch.as_tensor(label_gender_cate, dtype=torch.int64)
 
         label_age = torch.as_tensor(label_age, dtype=torch.int64)
         label_gender = torch.as_tensor(label_gender, dtype=torch.int64)
 
-        # ann = {'age': label_age, 'gender': label_gender}
+        ann = {}
+        ann['age'] = label_age
+        ann['gender'] = label_gender
+        ann['filename'] = img_pth
         if self.categorical:
-            label = torch.cat([label_gender, label_age], dim=0)
+            ann['age_categorical'] = label_age_cate
+            ann['gender_categorical'] = label_gender_cate
 
-            return img, label
-        else:
-            return img, label_age, label_gender
+        return img, ann
 
     def __len__(self):
         return len(self.img_pth_list) + len(self.sampled_img_pth_list)
