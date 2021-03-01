@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader, Subset, ConcatDataset
 from models.facenet_ds import FaceNetDS
 from models.mobilenetv2 import MobilenetV2
 from datasets.afad_dataset import AFADDataset
-from loss import custom_softmax_cross_entropy_loss
+from loss import custom_weighted_softmax_focal_loss as loss_func
 from metric import accuracy_argmax
 from utils.pytorch_util import make_batch
 from utils.util import time_calculator
@@ -23,9 +23,9 @@ if __name__ == '__main__':
     # Define hyper parameters, parsers
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--batch_size', required=False, type=int, default=64)
-    parser.add_argument('--learning_rate', required=False, type=float, default=.0001)
-    parser.add_argument('--weight_decay', required=False, type=float, default=0)
+    parser.add_argument('--batch_size', required=False, type=int, default=32)
+    parser.add_argument('--learning_rate', required=False, type=float, default=.001)
+    parser.add_argument('--weight_decay', required=False, type=float, default=.00005)
     parser.add_argument('--momentum', required=False, type=float, default=.9)
     parser.add_argument('--num_epochs', required=False, type=int, default=100)
 
@@ -41,11 +41,12 @@ if __name__ == '__main__':
 
     # Load AFAD dataset
     dset_name = 'afadfull'
-    root = 'C://DeepLearningData/AFAD-Full/'
+    root = 'D://DeepLearningData/AFAD-Full/'
     transform_og = transforms.Compose([transforms.Resize((224, 224)),
-                                       transforms.ToTensor(),
-                                       transforms.RandomRotation((-30, 30)),
-                                       transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+                                       transforms.ToTensor()])
+    transform_norm = transforms.Compose([transforms.Resize((224, 224)),
+                                         transforms.ToTensor(),
+                                         transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
     # transform_rotate = transforms.Compose([transforms.Resize((224, 224)),
     #                                        transforms.RandomRotation((-60, 60)),
     #                                        transforms.ToTensor(),
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     #                                      transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
 
     dset_og = AFADDataset(root=root, transforms=transform_og, categorical=True)
+    dset_norm = AFADDataset(root=root, transforms=transform_og, categorical=True)
     # dset_rotate = AFADDataset(root, transforms=transform_rotate, categorical=True)
     # dset_flip = AFADDataset(root, transforms=transform_flip, categorical=True)
 
@@ -65,11 +67,16 @@ if __name__ == '__main__':
     np.random.shuffle(indices)
     train_idx, val_idx = indices[:n_train_data], indices[n_train_data:]
 
-    train_dset = Subset(dset_og, indices=train_idx)
+    train_dset_og = Subset(dset_og, indices=train_idx)
+    train_dset_norm = Subset(dset_norm, indices=train_idx)
     # train_dset_rotate = Subset(dset_rotate, indices=train_idx)
     # train_dset_flip = Subset(dset_flip, indices=train_idx)
     # train_dset = ConcatDataset([train_dset_og, train_dset_rotate, train_dset_flip])
+
+    train_dset = ConcatDataset([train_dset_og, train_dset_norm])
     val_dset = Subset(dset_og, indices=val_idx)
+
+    weight_factor_age = dset_og.weight_factor.to(device)
 
     # Generate data loader
     train_loader = DataLoader(train_dset, batch_size=batch_size, shuffle=True, drop_last=True, collate_fn=dset_og.custom_collate_fn)
@@ -87,7 +94,6 @@ if __name__ == '__main__':
     # Define optimizer, metrics
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     # optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay, nesterov=True)
-    loss_func = custom_softmax_cross_entropy_loss
     acc_func = accuracy_argmax
 
     # train_loss_list = []
@@ -128,7 +134,7 @@ if __name__ == '__main__':
             # loss_age = custom_softmax_cross_entropy_loss(pred_age, y_age)
             # loss_gender = custom_softmax_cross_entropy_loss(pred_gender, y_gender)
             pred_age = model(x)
-            loss_age = loss_func(pred_age, y_age)
+            loss_age = loss_func(pred_age, y_age, weight_factor_age, 3)
 
             # loss = loss_age + loss_gender
 
@@ -195,7 +201,7 @@ if __name__ == '__main__':
 
                 # pred_age, pred_gender = model(x)
                 pred_age = model(x)
-                loss_age = loss_func(pred_age, y_age)
+                loss_age = loss_func(pred_age, y_age, weight_factor_age, 3)
 
                 # loss_age = loss_func(pred_age, y_age)
                 # loss_gender = loss_func(pred_gender, y_gender)

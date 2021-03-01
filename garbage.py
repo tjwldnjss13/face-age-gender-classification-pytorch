@@ -18,6 +18,5 @@ from os import listdir
 
 import numpy as np
 
-a = torch.zeros(3, 1, 1, 4)
-a = a.squeeze(dim=1)
-print(a.shape)
+a = torch.Tensor([2, 3])
+print(torch.pow(a, 2))
