@@ -88,12 +88,14 @@ class AFADDataset(data.Dataset):
         self.sampled_label_gender_list = None
         self.sampled_label_age_list = None
         self.class_num_dict = num_afad_data_dict
-        self.label_dict = {0: 'male', 1: 'female'}
-        self.weight_factor = self.get_weight_factor()
+        self.label_gender_dict = {0: 'male', 1: 'female'}
 
         self._load_annotation_list()
         if balanced:
             self._balance_dataset()
+
+        self.age_weight_factor = self.get_age_weight_factor()
+        self.gender_weight_factor = self.get_gender_weight_factor()
 
     def _load_annotation_list(self):
         print('Loading annotations...')
@@ -230,7 +232,7 @@ class AFADDataset(data.Dataset):
         else:
             return len(self.img_pth_list)
 
-    def get_weight_factor(self):
+    def get_age_weight_factor(self):
         weight_factor_list = torch.Tensor([0 for _ in range(self.num_age_classes)])
         keys = self.class_num_dict.keys()
         for k in keys:
@@ -238,6 +240,17 @@ class AFADDataset(data.Dataset):
 
         sum_num_data = torch.sum(weight_factor_list)
         weight_factor_list = sum_num_data / (26 * weight_factor_list)
+
+        return weight_factor_list
+
+    def get_gender_weight_factor(self):
+        weight_factor_list = torch.Tensor([0, 0])
+        labels_gender = torch.Tensor(self.label_gender_list)
+        for i in range(2):
+            weight_factor_list[i] = (labels_gender == i).sum()
+
+        sum_num_data = torch.sum(weight_factor_list)
+        weight_factor_list = sum_num_data / (2 * weight_factor_list)
 
         return weight_factor_list
 
@@ -264,9 +277,13 @@ class AFADDataset(data.Dataset):
 
 
 if __name__ == '__main__':
-    root = 'D://DeepLearningData/AFAD-Full'
-    afad_dset = AFADDataset(root)
-    print(afad_dset.weight_factor)
+    root = 'C://DeepLearningData/AFAD-Full'
+    train_root = os.path.join(root, 'Train')
+    test_root = os.path.join(root, 'Test')
+    train_dset = AFADDataset(train_root)
+    test_dset = AFADDataset(test_root)
+    train_wf_gender = train_dset.gender_weight_factor
+    print(train_wf_gender)
 
 
 

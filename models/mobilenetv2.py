@@ -48,6 +48,7 @@ class MobilenetV2(nn.Module):
         )
         self.classifier = nn.Linear(320, num_age_classes)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.softmax = nn.Softmax(dim=1)
 
         self._initialize_weight()
 
@@ -82,6 +83,7 @@ class MobilenetV2(nn.Module):
         x = self.dense(x)
         x = self.classifier(x)
         x = x.squeeze(-1).squeeze(-1)
+        x = self.softmax(x)
 
         return x
 

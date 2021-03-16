@@ -21,12 +21,22 @@ def custom_age_gender_loss(predict, target, weight_factor_age, lambda_age=1, lam
     return loss_gender + loss_age, loss_gender, loss_age
 
 
+def custom_weighted_focal_loss(predict, target, weight_factor, gamma=0):
+    assert predict.shape == target.shape
+
+    num_batches = predict.shape[0]
+    loss_temp = -(target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) +
+                  (1 - target) * torch.pow(predict, exponent=gamma) * torch.log2(1 - predict + 1e-20)) * weight_factor
+
+    return loss_temp.sum() / num_batches
+
+
 def custom_weighted_softmax_focal_loss(predict, target, weight_factor, gamma=0):
     assert predict.shape == target.shape
 
     predict = nn.Softmax(dim=len(predict.shape) - 1)(predict)
     num_batches = predict.shape[0]
-    loss_temp = -target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20)
+    loss_temp = -target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) * weight_factor
 
     return loss_temp.sum() / num_batches
 
@@ -58,7 +68,6 @@ def custom_cross_entropy_loss(predict, target):
     assert predict.shape == target.shape
 
     num_batches = predict.shape[0]
-    # loss_temp = -(target * torch.log2(predict + 1e-20) + (1 - target) * torch.log2(1 - predict + 1e-20))
-    loss_temp = -target * torch.log2(predict + 1e-20)
+    loss_temp = -(target * torch.log2(predict + 1e-20) + (1 - target) * torch.log2(1 - predict + 1e-20))
 
     return loss_temp.sum() / num_batches

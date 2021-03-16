@@ -18,5 +18,6 @@ from os import listdir
 
 import numpy as np
 
-a = torch.Tensor([2, 3])
-print(torch.pow(a, 2))
+a = torch.Tensor([1, 2, 3, 4])
+b = (a % 2 == 0).sum()
+print(b)
