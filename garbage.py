@@ -17,6 +17,38 @@ from os import listdir
 # print(val_dset.transform)
 
 import numpy as np
+import cv2 as cv
 
-a = torch.Tensor([2, 3])
-print(torch.pow(a, 2))
+a = torch.Tensor([1.224, 2.849])
+a = a.int()
+print(a)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
