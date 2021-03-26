@@ -16,9 +16,10 @@ class BottleneckResidualBlock(nn.Module):
         self.dsconv = DConv(self.mid_channels, 3, stride, 1)
         self.conv1X1_2 = nn.Conv2d(self.mid_channels, out_channels, 1, 1, 0)
         self.bn1 = nn.BatchNorm2d(self.mid_channels)
-        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.bn2 = nn.BatchNorm2d(self.mid_channels)
+        self.bn3 = nn.BatchNorm2d(out_channels)
         self.relu6 = nn.ReLU6(True)
-        self.lrelu = nn.LeakyReLU(.1, True)
+        self.lrelu = nn.LeakyReLU(inplace=True)
         self.dropout = nn.Dropout2d()
         if stride == 1:
             self.conv_residual = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
@@ -46,10 +47,10 @@ class BottleneckResidualBlock(nn.Module):
         # x = self.bn1(x)
         x = self.relu6(x)
         x = self.dsconv(x)
-        # x = self.bn1(x)
+        # x = self.bn2(x)
         x = self.relu6(x)
         x = self.conv1X1_2(x)
-        # x = self.bn2(x)
+        # x = self.bn3(x)
 
         residual = self.conv_residual(residual)
         x += residual

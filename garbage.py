@@ -52,3 +52,9 @@ print(a)
 
 
 
+<<<<<<< HEAD
+=======
+a = torch.Tensor([1, 2, 3, 4])
+b = (a % 2 == 0).sum()
+print(b)
+>>>>>>> d758cd946f48a0b58e192b1d240a465f3605ad11
