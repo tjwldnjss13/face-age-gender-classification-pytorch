@@ -18,6 +18,7 @@ class BottleneckResidualBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(self.mid_channels)
         self.bn2 = nn.BatchNorm2d(self.mid_channels)
         self.bn3 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(True)
         self.relu6 = nn.ReLU6(True)
         self.lrelu = nn.LeakyReLU(inplace=True)
         self.dropout = nn.Dropout2d()
@@ -44,18 +45,18 @@ class BottleneckResidualBlock(nn.Module):
     def forward(self, x):
         residual = x
         x = self.conv1x1_1(x)
-        # x = self.bn1(x)
-        x = self.relu6(x)
+        x = self.bn1(x)
+        x = self.lrelu(x)
         x = self.dsconv(x)
-        # x = self.bn2(x)
-        x = self.relu6(x)
+        x = self.bn2(x)
+        x = self.lrelu(x)
         x = self.conv1X1_2(x)
-        # x = self.bn3(x)
+        x = self.bn3(x)
 
         residual = self.conv_residual(residual)
         x += residual
 
-        x = self.relu6(x)
+        x = self.lrelu(x)
 
         return x
 

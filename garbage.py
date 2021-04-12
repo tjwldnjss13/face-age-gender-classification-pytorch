@@ -1,60 +1,24 @@
-import os
-import glob
-import torch
-
-from torch.utils.data import random_split
-
-from datasets.afad_dataset import AFADDataset
-from os import listdir
-
-# root = 'D://DeepLearningData/AFAD-Full/'
-# dset = AFADDataset(root=root)
-#
-# n_data = len(dset)
-# n_train_data = int(n_data * .7)
-# train_val_ratio = [n_train_data, n_data - n_train_data]
-# train_dset, val_dset = random_split(dset, train_val_ratio)
-# print(val_dset.transform)
-
 import numpy as np
-import cv2 as cv
+import torch.nn as nn
+import torchvision.transforms as transforms
+import matplotlib.pyplot as plt
 
-a = torch.Tensor([1.224, 2.849])
-a = a.int()
-print(a)
+from PIL import Image
 
+if __name__ == '__main__':
+    img_pth = './samples/861-0.jpg'
+    img = Image.open(img_pth)
 
+    transform = transforms.Compose([transforms.Resize((224, 224)), transforms.RandomVerticalFlip(1)])
+    img_shear = transform(img)
 
+    img = np.array(img)
+    img_shear = np.array(img_shear)
 
+    plt.figure(0)
+    plt.subplot(121)
+    plt.imshow(img)
+    plt.subplot(122)
+    plt.imshow(img_shear)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<<<<<<< HEAD
-=======
-a = torch.Tensor([1, 2, 3, 4])
-b = (a % 2 == 0).sum()
-print(b)
->>>>>>> d758cd946f48a0b58e192b1d240a465f3605ad11
+    plt.show()

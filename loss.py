@@ -22,6 +22,8 @@ def custom_age_gender_loss(predict, target_gender, target_age, weight_factor_age
 def custom_focal_loss(predict, target, gamma=0):
     assert predict.shape == target.shape
 
+    # print(predict[0])
+
     num_batches = predict.shape[0]
     loss_temp = -(target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) +
                   (1 - target) * torch.pow(predict, exponent=gamma) * torch.log2(1 - predict + 1e-20))
@@ -40,14 +42,16 @@ def custom_softmax_focal_loss(predict, target, gamma=0):
     return loss_temp.sum() / num_batches
 
 
-def custom_weighted_focal_loss(predict, target, weight_factor, gamma=0):
+def custom_weighted_focal_loss(predict, target, weight_factor, alpha=.25, gamma=2):
     assert predict.shape == target.shape
 
-    num_batches = predict.shape[0]
-    loss_temp = -(target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) +
-                  (1 - target) * torch.pow(predict, exponent=gamma) * torch.log2(1 - predict + 1e-20)) * weight_factor
+    N_batch = predict.shape[0]
+    loss_temp = -(alpha * target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) +
+                  (1 - alpha) * (1 - target) * torch.pow(predict, exponent=gamma) * torch.log2(1 - predict + 1e-20))
+    # loss_temp = -(target * torch.pow(1 - predict, exponent=gamma) * torch.log2(predict + 1e-20) +
+    #               (1 - target) * torch.pow(predict, exponent=gamma) * torch.log2(1 - predict + 1e-20)) * weight_factor
 
-    return loss_temp.sum() / num_batches
+    return loss_temp.sum() / N_batch
 
 
 def custom_weighted_softmax_focal_loss(predict, target, weight_factor, gamma=0):

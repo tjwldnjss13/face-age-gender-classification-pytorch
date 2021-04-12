@@ -17,7 +17,7 @@ from models.mobilenetv2_mini2 import MobilenetV2Mini
 from models.agnet import AGNet
 from datasets.afad_dataset import AFADDataset
 from datasets.augment import GaussianNoise
-from loss import custom_weighted_focal_loss, custom_focal_loss
+from loss import *
 from metric import accuracy_argmax as acc_func
 from utils.pytorch_util import make_batch
 from utils.util import time_calculator
@@ -31,10 +31,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--batch_size', required=False, type=int, default=32)
-    parser.add_argument('--learning_rate', required=False, type=float, default=.0001 * (.1 ** 0))
-    parser.add_argument('--weight_decay', required=False, type=float, default=.0005)
+    parser.add_argument('--learning_rate', required=False, type=float, default=.0001)
+    parser.add_argument('--weight_decay', required=False, type=float, default=.00005)
     parser.add_argument('--momentum', required=False, type=float, default=.9)
-    parser.add_argument('--num_epochs', required=False, type=int, default=50)
+    parser.add_argument('--num_epochs', required=False, type=int, default=20)
 
     args = parser.parse_args()
 
@@ -48,28 +48,32 @@ if __name__ == '__main__':
 
     # Load AFAD dataset
     dset_name = 'afadfull'
-    root = 'D://DeepLearningData/AFAD-Full/Train'
-    transform_og = transforms.Compose([transforms.Resize((224, 224)),
+    root = 'C://DeepLearningData/AFAD-Full/Train'
+    transform_og = transforms.Compose([transforms.Resize((112, 112)),
                                        transforms.ToTensor(),
                                        transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
     # transform_noise = transforms.Compose([transforms.Resize((224, 224)),
     #                                       transforms.ToTensor(),
     #                                       GaussianNoise(mean=0, std=.1),
     #                                       transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_flip = transforms.Compose([transforms.Resize((224, 224)),
-                                         transforms.RandomVerticalFlip(1),
+    transform_flip = transforms.Compose([transforms.Resize((112, 112)),
+                                         transforms.RandomHorizontalFlip(1),
                                          transforms.ToTensor(),
                                          transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
-    transform_rotate = transforms.Compose([transforms.Resize((224, 224)),
+    transform_rotate = transforms.Compose([transforms.Resize((112, 112)),
                                            transforms.RandomRotation(60),
                                            transforms.ToTensor(),
                                            transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
+    transform_shear = transforms.Compose([transforms.Resize((112, 112)),
+                                          transforms.RandomAffine(degrees=0, shear=20),
+                                          transforms.ToTensor(),
+                                          transforms.Normalize([.485, .456, .406], [.229, .224, .225])])
 
-    dset_og = AFADDataset(root=root, transforms=transform_og, categorical=True)
-    # dset_noise = AFADDataset(root=root, transforms=transform_noise, categorical=True)
-    dset_flip = AFADDataset(root=root, transforms=transform_flip, categorical=True)
-    dset_rotate = AFADDataset(root, transforms=transform_rotate, categorical=True)
-    # dset_flip = AFADDataset(root, transforms=transform_flip, categorical=True)
+    dset_og = AFADDataset(root=root, transform=transform_og, categorical=True)
+    # dset_noise = AFADDataset(root=root, transform=transform_noise, categorical=True)
+    dset_rotate = AFADDataset(root, transform=transform_rotate, categorical=True)
+    dset_flip = AFADDataset(root, transform=transform_flip, categorical=True)
+    dset_shear = AFADDataset(root, transform=transform_shear, categorical=True)
 
     n_data = len(dset_og)
     indices = list(range(n_data))
@@ -79,12 +83,11 @@ if __name__ == '__main__':
 
     train_dset = Subset(dset_og, indices=train_idx)
     # train_dset_noise = Subset(dset_noise, indices=train_idx)
-    train_dset_flip = Subset(dset_flip, indices=train_idx)
     train_dset_rotate = Subset(dset_rotate, indices=train_idx)
-    # train_dset_flip = Subset(dset_flip, indices=train_idx)
-    # train_dset = ConcatDataset([train_dset_og, train_dset_rotate, train_dset_flip])
+    train_dset_flip = Subset(dset_flip, indices=train_idx)
+    train_dset_shear = Subset(dset_shear, indices=train_idx)
 
-    train_dset = ConcatDataset([train_dset, train_dset_flip, train_dset_rotate])
+    train_dset = ConcatDataset([train_dset, train_dset_flip, train_dset_rotate, train_dset_shear])
     val_dset = Subset(dset_og, indices=val_idx)
 
     weight_factor_age = dset_og.age_weight_factor.to(device)
@@ -99,17 +102,18 @@ if __name__ == '__main__':
     # model = CustomMobilenetV2(dset_og.num_age_classes, freeze_convs=True).to(device)
     model = AGNet(dset_og.num_age_classes).to(device)
     state_dict_pth = None
-    # state_dict_pth = 'pretrained models/mobilenetv2mini_afadfull_13epoch_0.0001lr_4.34411loss_3.87846lossage_0.46565lossgender_0.07522accage_0.63105accgender.pth'
+    # state_dict_pth = 'pretrained models/AGNet_afadfull_7epoch_0.0001lr_5.68728loss_5.63766lossage_0.04962lossgender_0.10419accage_0.93183accgender.pth'
     if state_dict_pth is not None:
         model.load_state_dict(torch.load(state_dict_pth), strict=False)
 
     # Define optimizer, metrics
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     # optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
 
     # Define early-stopping class
     early_stopping = EarlyStopping(patience=7)
 
+    num_iter = 0
     train_loss_list = []
     train_loss_age_list = []
     train_loss_gender_list = []
@@ -136,8 +140,10 @@ if __name__ == '__main__':
         for i, (imgs, anns) in enumerate(train_loader):
             num_data += len(imgs)
             num_batches += 1
+            num_iter += 1
 
             print('[{}/{}] '.format(e + 1, num_epochs), end='')
+            print(f'({num_iter}) ', end='')
             print('{}/{}  '.format(num_data, len(train_dset)), end='')
 
             x = make_batch(imgs).to(device)
@@ -145,13 +151,18 @@ if __name__ == '__main__':
             y_gender = make_batch(anns, 'gender_categorical').to(device)
 
             pred_age, pred_gender = model(x)
-            loss_age = custom_weighted_focal_loss(pred_age, y_age, weight_factor_age, 2)
-            loss_gender = custom_focal_loss(pred_gender, y_gender, 2)
+            # loss_age = custom_weighted_focal_loss(pred_age, y_age, weight_factor_age, 2)
+            loss_age = custom_focal_loss(pred_age, y_age)
+            loss_gender = custom_focal_loss(pred_gender, y_gender) * .1
 
             loss = loss_age + loss_gender
 
+            if torch.isnan(loss).sum() > 0:
+                exit(0)
+
             optimizer.zero_grad()
-            loss_age.backward()
+            loss.backward()
+            # loss_age.backward()
             optimizer.step()
 
             loss = loss.detach().cpu().item()
@@ -176,7 +187,14 @@ if __name__ == '__main__':
                   f'<acc_age> {acc_age:<9f}  <acc_gender> {acc_gender:<9f}  ', end='')
             print(f'<loss_avg> {train_loss / num_batches:>9f}  <loss_age_avg> {train_loss_age / num_batches:<9f}  <loss_gender_avg> {train_loss_gender / num_batches:<9f}  '
                   f'<acc_age_avg> {train_acc_age / num_batches:<9f}  <acc_gender_avg> {train_acc_gender / num_batches:<9f}  ', end='')
+            # print(f'<loss_age> {loss_age:<9f}  <acc_age> {acc_age:<9f}  ', end='')
+            # print(f'<loss_age_avg> {train_loss_age / num_batches:<9f}  <acc_age_avg> {train_acc_age / num_batches:<9f}  ',
+            #     end='')
             print(f'<time> {int(H):02d}:{int(M):02d}:{int(S):02d}')
+
+            if num_iter > 0 and num_iter % 5000 == 0:
+                save_pth = f'saved models/ckp_{model_name}_{dset_name}_{e + 1}epoch_{num_iter}iter_{learning_rate}lr.pth'
+                torch.save(model.state_dict(), save_pth)
 
             del x, y_age, y_gender, loss, loss_age, loss_gender, acc_age, acc_gender
 
@@ -191,6 +209,8 @@ if __name__ == '__main__':
 
         print(f'\t\t<train_loss> {train_loss_list[-1]:<9f}  <train_loss_age> {train_loss_age_list[-1]:<9f}  <trian loss_gender> {train_loss_gender_list[-1]:<9f}  ', end='')
         print(f'<train_acc_age> {train_acc_age_list[-1]:<9f}  <train_acc_gender> {train_acc_gender_list[-1]:<9f}  ', end='')
+        # print(f'\t\t<train_loss_age> {train_loss_age_list[-1]:<9f}  ', end='')
+        # print(f'<train_acc_age> {train_acc_age_list[-1]:<9f}  ', end='')
         print(f'<time> {int(H):02d}:{int(M):02d}:{int(S):02d}')
 
         num_batches = 0
@@ -211,8 +231,8 @@ if __name__ == '__main__':
                 y_gender = make_batch(anns, 'gender_categorical').to(device)
 
                 pred_age, pred_gender = model(x)
-                loss_age = custom_weighted_focal_loss(pred_age, y_age, weight_factor_age, 2)
-                loss_gender = custom_focal_loss(pred_gender, y_gender, 2)
+                loss_age = custom_focal_loss(pred_age, y_age)
+                loss_gender = custom_focal_loss(pred_gender, y_gender) * .1
 
                 loss = loss_age + loss_gender
 

@@ -72,10 +72,10 @@ num_afad_data_dict = {
 
 
 class AFADDataset(data.Dataset):
-    def __init__(self, root, transforms=transforms.Compose([transforms.ToTensor()]), categorical=False, balanced=False):
+    def __init__(self, root, transform=None, categorical=False, balanced=False):
         super(AFADDataset, self).__init__()
         self.root = root
-        self.transforms = transforms
+        self.transform = transform if transform is not None else transforms.ToTensor()
         self.categorical = categorical
         self.balanced = balanced
 
@@ -180,7 +180,7 @@ class AFADDataset(data.Dataset):
             label_age = min(label_age, 40)
             label_gender = self.label_gender_list[idx]
 
-        img = self.transforms(img)
+        img = self.transform(img)
 
         # label_age = min(label_age, 40)
         # if label_age <= 16:

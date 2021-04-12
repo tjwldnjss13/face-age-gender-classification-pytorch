@@ -11,11 +11,11 @@ from xml.etree.ElementTree import Element, ElementTree
 
 
 class VOCDataset(data.Dataset):
-    def __init__(self, root, img_size, segmentation=False, shuffle_seg=False, transforms=None, is_categorical=True):
+    def __init__(self, root, img_size, segmentation=False, shuffle_seg=False, transform=None, is_categorical=True):
         self.root = root
         self.img_size = img_size
         self.segmentation = segmentation
-        self.transforms = transforms
+        self.transform = transform
         self.is_categorical = is_categorical
         self.num_classes = 20
         self.class_dict_with_bg = {'background': 0, 'aeroplane': 1, 'bicycle': 2, 'bird': 3, 'boat': 4, 'bottle': 5, 'bus': 6, 'car': 7, 'cat': 8,
@@ -42,9 +42,9 @@ class VOCDataset(data.Dataset):
             gt_pth = os.path.join(gt_dir, self.filenames[idx])
             gt = Image.open(gt_pth)
 
-            if self.transforms is not None:
-                img = self.transforms(img)
-                gt = self.transforms(gt)
+            if self.transform is not None:
+                img = self.transform(img)
+                gt = self.transform(gt)
             else:
                 img = torch.as_tensor(img, dtype=torch.float64)
                 gt = torch.as_tensor(gt, dtype=torch.float64)
@@ -58,8 +58,8 @@ class VOCDataset(data.Dataset):
             img = Image.open(img_path).convert('RGB')
             img_np = np.array(img)
 
-            if self.transforms is not None:
-                img = self.transforms(img)
+            if self.transform is not None:
+                img = self.transform(img)
             else:
                 img = torch.as_tensor(img, dtype=torch.float64)
 
